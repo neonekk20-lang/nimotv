@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoChat - Prototyp</title>
+    <style>
+        /* CSS - STYLIZACJA */
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --accent: #2ed573;
+            --danger: #ff4757;
+            --text: #ffffff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-dark); 
+            color: var(--text); 
+            height: 100vh; 
+            display: flex; 
+            overflow: hidden; 
+        }
+
+        .container { display: flex; width: 100%; height: 100%; }
+
+        /* Sekcja Wideo */
+        .video-section { 
+            flex: 3; 
+            display: flex; 
+            flex-direction: column; 
+            background: #000; 
+        }
+
+        .video-wrapper { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            padding: 10px; 
+        }
+
+        .video-box { 
+            flex: 1; 
+            background: var(--panel-bg); 
+            border-radius: 12px; 
+            position: relative; 
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+        }
+
+        /* Podgląd Twojej kamery */
+        video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            position: absolute;
+            background: #000;
+        }
+        #localVideo { transform: scaleX(-1); } /* Lustrzane odbicie */
+
+        .label { 
+            position: absolute; 
+            bottom: 15px; 
+            left: 15px; 
+            background: rgba(0,0,0,0.7); 
+            padding: 6px 15px; 
+            border-radius: 20px; 
+            font-size: 0.8rem;
+            z-index: 10;
+        }
+
+        /* Panel Sterowania */
+        .controls { 
+            height: 100px; 
+            background: #181818; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 15px; 
+            padding: 0 20px;
+        }
+
+        .btn { 
+            padding: 12px 20px; 
+            border: none; 
+            border-radius: 25px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.3s;
+            color: white;
+            min-width: 120px;
+        }
+        
+        .btn-toggle { background: #333; }
+        .btn-toggle.off { background: var(--danger); }
+        
+        .btn-next { 
+            background: var(--accent); 
+            font-size: 1.1rem; 
+            padding: 15px 40px; 
+        }
+
+        .btn:hover { opacity: 0.8; transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
+
+        /* Sekcja Czatu */
+        .chat-section { 
+            flex: 1; 
+            background: var(--panel-bg); 
+            border-left: 1px solid #333; 
+            display: flex; 
+            flex-direction: column; 
+            min-width: 300px;
+        }
+
+        .chat-messages { 
+            flex: 1; 
+            padding: 20px; 
+            overflow-y: auto; 
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .msg-sys { color: var(--accent); font-size: 0.85rem; font-style: italic; }
+        .msg-user { background: #333; padding: 8px 12px; border-radius: 8px; align-self: flex-start; max-width: 80%; }
+
+        .chat-input { 
+            padding: 20px; 
+            background: #181818; 
+            display: flex; 
+            gap: 10px; 
+        }
+
+        .chat-input input { 
+            flex: 1; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: none; 
+            background: #333; 
+            color: white; 
+            outline: none;
+        }
+
+        /* Responsywność dla telefonów */
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .chat-section { min-width: 100%; height: 250px; }
+            .controls { height: 80px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <main class="video-section">
+            <div class="video-wrapper">
+                <div class="video-box">
+                    <div class="label">Nieznajomy</div>
+                    <p style="color: #555;">Oczekiwanie na połączenie...</p>
+                </div>
+                <div class="video-box">
+                    <video id="localVideo" autoplay muted playsinline></video>
+                    <div class="label">Ty</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="toggleMic" class="btn btn-toggle">Mikrofon: ON</button>
+                <button id="toggleCam" class="btn btn-toggle">Kamera: ON</button>
+                <button id="nextBtn" class="btn btn-next">NASTĘPNY</button>
+            </div>
+        </main>
+
+        <aside class="chat-section">
+            <div class="chat-messages" id="chatBox">
+                <p class="msg-sys">System: Witaj! Zezwól na dostęp do kamery, aby zacząć rozmawiać.</p>
+            </div>
+            <form class="chat-input" id="chatForm">
+                <input type="text" id="chatInput" placeholder="Napisz wiadomość..." autocomplete="off">
+            </form>
+        </aside>
+    </div>
+
+    <script>
+        // JS - LOGIKA
+        const localVideo = document.getElementById('localVideo');
+        const chatBox = document.getElementById('chatBox');
+        const chatForm = document.getElementById('chatForm');
+        const chatInput = document.getElementById('chatInput');
+        
+        const btnMic = document.getElementById('toggleMic');
+        const btnCam = document.getElementById('toggleCam');
+        const btnNext = document.getElementById('nextBtn');
+
+        let localStream;
+
+        // 1. Inicjalizacja kamery i mikrofonu
+        async function startApp() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                localVideo.srcObject = localStream;
+                addMessage("System: Połączono z kamerą.", "msg-sys");
+            } catch (err) {
+                addMessage("Błąd: Brak uprawnień do kamery/mikrofonu.", "msg-sys");
+                console.error(err);
+            }
+        }
+
+        // 2. Obsługa czatu
+        chatForm.onsubmit = (e) => {
+            e.preventDefault();
+            if (chatInput.value.trim() !== "") {
+                addMessage(chatInput.value, "msg-user");
+                chatInput.value = "";
+            }
+        };
+
+        function addMessage(text, className) {
+            const msg = document.createElement('p');
+            msg.className = className;
+            msg.innerText = text;
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 3. Przełączniki ON/OFF
+        btnMic.onclick = () => {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                btnMic.innerText = `Mikrofon: ${audioTrack.enabled ? 'ON' : 'OFF'}`;
+                btnMic.classList.toggle('off', !audioTrack.enabled);
+            }
+        };
+
+        btnCam.onclick = () => {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                btnCam.innerText = `Kamera: ${videoTrack.enabled ? 'ON' : 'OFF'}`;
+                btnCam.classList.toggle('off', !videoTrack.enabled);
+            }
+        };
+
+        // 4. Przycisk Następny (Symulacja)
+        btnNext.onclick = () => {
+            addMessage("System: Szukanie nowego rozmówcy...", "msg-sys");
+        };
+
+        // Uruchomienie przy starcie
+        startApp();
+    </script>
+</body>
+</html>
